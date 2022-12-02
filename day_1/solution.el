@@ -3,11 +3,7 @@
 ;;; reference https://adventofcode.com/2022/day/1
 ;;; Code:
 
-(defun get-file-content (filename)
-  "Read `FILENAME content and return it as a string."
-  (with-temp-buffer
-    (insert-file-contents filename)
-    (buffer-string)))
+(load-file "../input.el")
 
 (defun part-1 ()
   "Solve part 1 of problem statement."
