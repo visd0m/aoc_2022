@@ -12,31 +12,26 @@
     ("B" "C")
     ("C" "A")))
 
-(defun replace-opponent-symbol (strategy-guide)
-  "Replace oppontent symbols with player symbols in `STRATEGY-GUIDE."
-  (string-replace "Z" "C" (string-replace "Y" "B" (string-replace "X" "A" strategy-guide))))
+(defun lower-priority-symbol (symbol)
+  "Given `SYMBOL, get symbol with lower priority."
+  (pcase symbol
+    ("B" "A")
+    ("C" "B")
+    ("A" "C")))
 
-(defun part-1 (input)
-  "Solve part 1 of advent of code day 2 for the given `INPUT."
-  (seq-reduce '+
-              (seq-map 'round-score
-                       (seq-filter (lambda (round) (not (string-empty-p round)))
-                                   (split-string (replace-opponent-symbol input) "\n")))
-              0))
+(defun decode-as-your-move (to-decode _)
+  "Decode `TO-DECODE symbol as your move."
+  (pcase to-decode
+    ("X" "A")
+    ("Y" "B")
+    ("Z" "C")))
 
-;; (defun part-2 )
-
-(defun round-score (round)
-  "Get the score of `ROUND."
+(defun round-score (round decoding-function)
+  "Given a 'DECODING-FUNCTION, get the score of `ROUND."
   (let* ((round-moves (split-string round " "))
          (opponent-move (nth 0 round-moves))
-         (your-move (nth 1 round-moves)))
+         (your-move (funcall decoding-function (nth 1 round-moves) opponent-move)))
   (+ (result-score (cons your-move opponent-move)) (your-move-score your-move))))
-
-(defun decode (to-decode opponent-choice strategy)
-  "Decode `TO-DECODE symbol based on `STRATEGY and `OPPONENT-CHOICE."
-  (pcase (cons strategy to-decode opponent-move)
-    ('('your-move . "A" ) )))
 
 (defun result-score (choices)
   "Get the result score based on round `CHOICES."
@@ -53,10 +48,33 @@
     ("B" 2)
     ("C" 3)))
 
-(result-score (cons "A" "A"))
+(defun solution (input decoding-function)
+  "Given `INPUT and a `DECODING-FUNCTION solve day 2 problem."
+  (seq-reduce '+
+              (seq-map (lambda (round) (round-score round decoding-function))
+                       (seq-filter (lambda (round) (not (string-empty-p round)))
+                                   (split-string input "\n")))
+              0))
+
+(defun part-1 (input)
+  "Solve part 1 of advent of code day 2 for the given `INPUT."
+  (solution input 'decode-as-your-move))
 
 (part-1 (get-file-content "./input.txt"))
 (part-1 "A Y\nB X\nC Z\n")
+
+(defun decode-as-expected-result (to-decode opponent-move)
+  "Decode `TO-DECODE as expected result, return your move given `OPPONENT-MOVE."
+  (pcase to-decode
+    ("X" (lower-priority-symbol opponent-move))
+    ("Y" opponent-move)
+    ("Z" (higher-priority-symbol opponent-move))))
+
+(defun part-2 (input)
+  "Solve part 1 of advent of code day 2 for the given `INPUT."
+  (solution input 'decode-as-expected-result))
+
+(part-2 (get-file-content "./input.txt"))
 
 (provide 'solution)
 ;;; solution.el ends here
