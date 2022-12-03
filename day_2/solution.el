@@ -1,4 +1,4 @@
-;;; package --- solution day 1 aoc2022
+;;; package --- solution day 2 aoc2022
 ;;; Commentary:
 ;;; reference https://adventofcode.com/2022/day/2
 ;;; Code:
