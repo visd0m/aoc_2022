@@ -5,95 +5,6 @@
 
 (load-file "../input.el")
 
-(defun parse-file-system (input)
-  "Parse given `INPUT representing filesystem described."
-  (let* ((fs (node "/" 0 nil))
-         (current-path nil)
-         (input-lines (seq-filter (lambda (line) (not (string-empty-p line))) (split-string input "\n"))))
-    (car (seq-reduce (lambda (acc line) (interpret-line line (car acc) (cdr acc))) input-lines (cons fs current-path)))))
-
-(defun solution (input)
-  "Provide solution for problem presented in day 6 for a given `INPUT."
-  (let* ((fs (parse-file-system input))
-         (fs-size-acc (size fs (list)))
-         (dir-matching-sizes (cdr fs-size-acc)))
-    (seq-reduce '+ dir-matching-sizes 0)))
-
-(defun part-1 (input)
-  "Provide solution for day 6 part 1 for given `INPUT."
-  (solution input))
-
-(part-1 (get-file-content "./input.txt"))
-
-(cdr (size (parse-file-system (get-file-content "./input.txt")) ()))
-
-
-(message (format "%s" (parse-file-system "$ cd /
-$ ls
-dir a
-14848514 b.txt
-8504156 c.dat
-dir d
-$ cd a
-$ ls
-dir e
-29116 f
-2557 g
-62596 h.lst
-$ cd e
-$ ls
-584 i
-$ cd ..
-$ cd ..
-$ cd d
-$ ls
-4060174 j
-8033020 d.log
-5626152 d.ext
-7214296 k")))
-
-(cdr (size (parse-file-system "$ cd /
-$ ls
-dir a
-14848514 b.txt
-8504156 c.dat
-dir d
-$ cd a
-$ ls
-dir e
-29116 f
-2557 g
-62596 h.lst
-$ cd e
-$ ls
-584 i
-$ cd ..
-$ cd ..
-$ cd d
-$ ls
-4060174 j
-8033020 d.log
-5626152 d.ext
-7214296 k") (list)))
-
-
-(defun interpret-line (line fs current-path)
-  "Interpret `LINE updating `FS accordingly to `CURRENT-PATH."
-  (if (equal (substring line 0 1) "$")
-      (interpret-command line fs current-path)
-    (interpret-output line fs current-path)))
-
-(defun interpret-command (line fs current-path)
-  "Read `LINE and interpret it as command updating `FS accordingly to `CURRENT-PATH."
-  (let* ((tokens (split-string line " "))
-         (command (nth 1 tokens)))
-    (pcase command
-      ("ls" (cons fs current-path))
-      ("cd" (let ((to-go (nth 2 tokens)))
-              (pcase to-go
-                (".." (cons fs (remove-last current-path)))
-                (_ (cons fs (add-last to-go current-path)))))))))
-
 (defun add-last (elem list)
   "Add `ELEM as last element of `LIST."
   (if (not list)
@@ -105,16 +16,6 @@ $ ls
   (if (not (cdr list))
       nil
     (cons (car list) (remove-last (cdr list)))))
-
-(add-last 1 '(1 2 3))
-
-(defun interpret-output (line fs current-path)
-  "Read `LINE and interpret it as output updating `FS accordingly to `CURRENT-PATH."
-  (let* ((current-node (nth 0 (last current-path)))
-         (tokens (split-string (string-replace "dir" "0" line) " "))
-         (size (string-to-number (nth 0 tokens)))
-         (name (nth 1 tokens)))
-    (cons (add-child current-node fs (node name size nil)) current-path)))
 
 (defun node (name size children)
   "Create a node with given `NAME,`SIZE and `CHILDREN."
@@ -135,8 +36,8 @@ $ ls
   "Get the children of given `NODE."
   (cdr node))
 
-(defun size (node acc)
-  "Calculate she size of the given `NODE returning matching sizes in `ACC."
+(defun size (node acc limit comparison)
+  "Calculate she size of the given `NODE returning matching sizes in `ACC accroding to `LIMIT and `COMPARISON."
   (let ((children (children node))
         (node-size (cdr (car node))))
     (if (not children)
@@ -144,19 +45,65 @@ $ ls
       (let ((dir-size-acc (seq-reduce
                            (lambda (acc size-acc)
                              (cons (+ (car acc) (car size-acc)) (seq-concatenate 'list (cdr acc) (cdr size-acc))))
-                           (seq-map (lambda (node-child) (size node-child acc)) children)
+                           (seq-map (lambda (node-child) (size node-child acc limit comparison)) children)
                            (cons 0 acc))))
-        (if (< (car dir-size-acc) 100000)
+        (if (funcall comparison (car dir-size-acc) limit)
             (cons (car dir-size-acc) (cons (car dir-size-acc) (cdr dir-size-acc)))
           (cons (car dir-size-acc) (cdr dir-size-acc)))))))
 
-(setq fs (node "/" 0 (list (node "foo.txt" 100 nil)
-                  (node "foo-dir" 0
-                        (list (node "bar" 1 nil) (node "baz" 2 nil))))))
+(defun interpret-output (line fs current-path)
+  "Read `LINE and interpret it as output updating `FS accordingly to `CURRENT-PATH."
+  (let* ((current-node (string-join current-path))
+         (tokens (split-string (string-replace "dir" "0" line) " "))
+         (size (string-to-number (nth 0 tokens)))
+         (name (nth 1 tokens)))
+    (cons (add-child current-node fs (node (format "%s%s" current-node name) size nil)) current-path)))
 
-(add-child "bar" fs (node "foobar" 1 nil))
+(defun interpret-command (line fs current-path)
+  "Read `LINE and interpret it as command updating `FS accordingly to `CURRENT-PATH."
+  (let* ((tokens (split-string line " "))
+         (command (nth 1 tokens)))
+    (pcase command
+      ("ls" (cons fs current-path))
+      ("cd" (let ((to-go (nth 2 tokens)))
+              (pcase to-go
+                (".." (cons fs (remove-last current-path)))
+                (_ (cons fs (add-last to-go current-path)))))))))
 
-fs
+(defun interpret-line (line fs current-path)
+  "Interpret `LINE updating `FS accordingly to `CURRENT-PATH."
+  (if (equal (substring line 0 1) "$")
+      (interpret-command line fs current-path)
+    (interpret-output line fs current-path)))
+
+(defun parse-file-system (input)
+  "Parse given `INPUT representing filesystem described."
+  (let* ((fs (node "/" 0 nil))
+         (current-path nil)
+         (input-lines (seq-filter (lambda (line) (not (string-empty-p line))) (split-string input "\n"))))
+    (car (seq-reduce (lambda (acc line) (interpret-line line (car acc) (cdr acc))) input-lines (cons fs current-path)))))
+
+(defun solution-part-1 (input)
+  "Provide solution for problem presented in day 6 part 1 for a given `INPUT."
+  (let* ((fs (parse-file-system input))
+         (fs-size-acc (size fs (list) 100000 '<=))
+         (sum (seq-reduce '+ (cdr fs-size-acc) 0)))
+    sum))
+
+(solution-part-1 (get-file-content "./input.txt"))
+
+(defun solution-part-2 (input)
+  "Provide solution for problem presented in day 6 part 2 for a given `INPUT."
+  (let* ((fs (parse-file-system input))
+         (fs-size-acc (size fs (list) 0 '<))
+         (total-used-size (car fs-size-acc))
+         (free-space (- 70000000 total-used-size))
+         (to-free (- 30000000 free-space))
+         (fs-size-acc (size fs (list) to-free '>=))
+         (to-delete (seq-min (cdr fs-size-acc))))
+    to-delete))
+
+(solution-2 (get-file-content "./input.txt"))
 
 (provide 'solution)
 ;;; solution.el ends here
