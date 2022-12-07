@@ -10,7 +10,23 @@
   (let* ((fs (node "/" 0 nil))
          (current-path nil)
          (input-lines (seq-filter (lambda (line) (not (string-empty-p line))) (split-string input "\n"))))
-    (seq-reduce (lambda (acc line) (interpret-line line (car acc) (cdr acc))) input-lines (cons fs current-path))))
+    (car (seq-reduce (lambda (acc line) (interpret-line line (car acc) (cdr acc))) input-lines (cons fs current-path)))))
+
+(defun solution (input)
+  "Provide solution for problem presented in day 6 for a given `INPUT."
+  (let* ((fs (parse-file-system input))
+         (fs-size-acc (size fs (list)))
+         (dir-matching-sizes (cdr fs-size-acc)))
+    (seq-reduce '+ dir-matching-sizes 0)))
+
+(defun part-1 (input)
+  "Provide solution for day 6 part 1 for given `INPUT."
+  (solution input))
+
+(part-1 (get-file-content "./input.txt"))
+
+(cdr (size (parse-file-system (get-file-content "./input.txt")) ()))
+
 
 (message (format "%s" (parse-file-system "$ cd /
 $ ls
@@ -35,6 +51,31 @@ $ ls
 8033020 d.log
 5626152 d.ext
 7214296 k")))
+
+(cdr (size (parse-file-system "$ cd /
+$ ls
+dir a
+14848514 b.txt
+8504156 c.dat
+dir d
+$ cd a
+$ ls
+dir e
+29116 f
+2557 g
+62596 h.lst
+$ cd e
+$ ls
+584 i
+$ cd ..
+$ cd ..
+$ cd d
+$ ls
+4060174 j
+8033020 d.log
+5626152 d.ext
+7214296 k") (list)))
+
 
 (defun interpret-line (line fs current-path)
   "Interpret `LINE updating `FS accordingly to `CURRENT-PATH."
@@ -71,13 +112,8 @@ $ ls
   "Read `LINE and interpret it as output updating `FS accordingly to `CURRENT-PATH."
   (let* ((current-node (nth 0 (last current-path)))
          (tokens (split-string (string-replace "dir" "0" line) " "))
-         (size (nth 0 tokens))
+         (size (string-to-number (nth 0 tokens)))
          (name (nth 1 tokens)))
-    (message "++++++++++++++++++++++")
-    (message (format "name: %s" name))
-    (message (format "size: %s" size))
-    (message (format "current-path: %s" current-path))
-    (message (format "current-node: %s" current-node))
     (cons (add-child current-node fs (node name size nil)) current-path)))
 
 (defun node (name size children)
@@ -93,19 +129,26 @@ $ ls
   (if (equal name (name node))
       (let ((children (cons child (children node))))
         (node (name node) 0 children))
-    (node (name node) 0 (seq-map (lambda (node-child) (add-child name node-child child)) (children node)))))
+    (node (name node) (cdr (car node)) (seq-map (lambda (node-child) (add-child name node-child child)) (children node)))))
 
 (defun children (node)
   "Get the children of given `NODE."
   (cdr node))
 
-(defun size (node)
-  "Calculate she size of the given `NODE."
+(defun size (node acc)
+  "Calculate she size of the given `NODE returning matching sizes in `ACC."
   (let ((children (children node))
         (node-size (cdr (car node))))
     (if (not children)
-        node-size
-      (+ node-size (seq-reduce '+ (seq-map 'size children) 0)))))
+        (cons node-size acc)
+      (let ((dir-size-acc (seq-reduce
+                           (lambda (acc size-acc)
+                             (cons (+ (car acc) (car size-acc)) (seq-concatenate 'list (cdr acc) (cdr size-acc))))
+                           (seq-map (lambda (node-child) (size node-child acc)) children)
+                           (cons 0 acc))))
+        (if (< (car dir-size-acc) 100000)
+            (cons (car dir-size-acc) (cons (car dir-size-acc) (cdr dir-size-acc)))
+          (cons (car dir-size-acc) (cdr dir-size-acc)))))))
 
 (setq fs (node "/" 0 (list (node "foo.txt" 100 nil)
                   (node "foo-dir" 0
@@ -114,10 +157,6 @@ $ ls
 (add-child "bar" fs (node "foobar" 1 nil))
 
 fs
-
-(size (node "/" 0 (list (node "foo.txt" 100 nil)
-                  (node "foo-dir" 0
-                        (list (node "bar" 1 nil) (node "baz" 2 nil))))))
 
 (provide 'solution)
 ;;; solution.el ends here
