@@ -19,10 +19,6 @@
   (let ((tokens (split-string str "-")))
     (make-range (nth 0 tokens) (nth 1 tokens))))
 
-(defun range-lenght (range)
-  "Get the lenght of the given `RANGE."
-  (- (cdr range) (car range)))
-
 (defun sub-range-p (r1 r2)
   "Return if `R1 is subrange of `R2."
   (and (>= (car r1) (car r2)) (<= (cdr r1) (cdr r2))))
